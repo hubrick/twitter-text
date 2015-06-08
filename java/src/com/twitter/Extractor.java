@@ -14,7 +14,7 @@ import java.util.regex.Matcher;
 public class Extractor {
   public static class Entity {
     public enum Type {
-      URL, HASHTAG, MENTION, CASHTAG
+      URL, HASHTAG, MENTION, MENTION_UUID, CASHTAG
     }
     protected int start;
     protected int end;
@@ -156,6 +156,7 @@ public class Extractor {
     entities.addAll(extractURLsWithIndices(text));
     entities.addAll(extractHashtagsWithIndices(text, false));
     entities.addAll(extractMentionsOrListsWithIndices(text));
+    entities.addAll(extractMentionsUUIDOrListsWithIndices(text));
     entities.addAll(extractCashtagsWithIndices(text));
 
     removeOverlappingEntities(entities);
@@ -228,6 +229,66 @@ public class Extractor {
               matcher.group(Regex.VALID_MENTION_OR_LIST_GROUP_USERNAME),
               matcher.group(Regex.VALID_MENTION_OR_LIST_GROUP_LIST),
               Entity.Type.MENTION));
+        }
+      }
+    }
+    return extracted;
+  }
+
+  public List<String> extractMentionedUUIDScreennames(String text) {
+    if (text == null || text.length() == 0) {
+      return Collections.emptyList();
+    }
+
+    List<String> extracted = new ArrayList<String>();
+    for (Entity entity : extractMentionedUUIDScreennamesWithIndices(text)) {
+      extracted.add(entity.value);
+    }
+    return extracted;
+  }
+
+  public List<Entity> extractMentionedUUIDScreennamesWithIndices(String text) {
+    List<Entity> extracted = new ArrayList<Entity>();
+    for (Entity entity : extractMentionsUUIDOrListsWithIndices(text)) {
+      if (entity.listSlug == null) {
+        extracted.add(entity);
+      }
+    }
+    return extracted;
+  }
+
+  public List<Entity> extractMentionsUUIDOrListsWithIndices(String text) {
+    if (text == null || text.length() == 0) {
+      return Collections.emptyList();
+    }
+
+    // Performance optimization.
+    // If text doesn't contain @/＠ at all, the text doesn't
+    // contain @mention. So we can simply return an empty list.
+    boolean found = false;
+    for (char c : text.toCharArray()) {
+      if (c == '@' || c == '＠') {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      return Collections.emptyList();
+    }
+
+    List<Entity> extracted = new ArrayList<Entity>();
+    Matcher matcher = Regex.VALID_MENTION_UUID_OR_LIST.matcher(text);
+    while (matcher.find()) {
+      String after = text.substring(matcher.end());
+      if (! Regex.INVALID_MENTION_MATCH_END.matcher(after).find()) {
+        if (matcher.group(Regex.VALID_MENTION_OR_LIST_GROUP_LIST) == null) {
+          extracted.add(new Entity(matcher, Entity.Type.MENTION_UUID, Regex.VALID_MENTION_OR_LIST_GROUP_USERNAME));
+        } else {
+          extracted.add(new Entity(matcher.start(Regex.VALID_MENTION_OR_LIST_GROUP_USERNAME) - 1,
+                  matcher.end(Regex.VALID_MENTION_OR_LIST_GROUP_LIST),
+                  matcher.group(Regex.VALID_MENTION_OR_LIST_GROUP_USERNAME),
+                  matcher.group(Regex.VALID_MENTION_OR_LIST_GROUP_LIST),
+                  Entity.Type.MENTION_UUID));
         }
       }
     }

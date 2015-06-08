@@ -339,6 +339,7 @@ public class Autolink {
   /**
    * Auto-link URLs in the Tweet text provided.
    * This only auto-links URLs with protocol.
+   * </p>
    *
    * @param text of the Tweet to auto-link
    * @return text with auto-link HTML added
