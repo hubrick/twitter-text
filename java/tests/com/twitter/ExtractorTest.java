@@ -16,7 +16,7 @@ public class ExtractorTest extends TestCase {
 
   public static Test suite() {
     Class<?>[] testClasses = { OffsetConversionTest.class, ReplyTest.class,
-            MentionTest.class, HashtagTest.class, URLTest.class };
+            MentionTest.class, MentionUUIDTest.class, HashtagTest.class, URLTest.class };
     return new TestSuite(testClasses);
   }
 
@@ -196,6 +196,73 @@ public class ExtractorTest extends TestCase {
       assertEquals(11, extracted.get(0).end);
       assertEquals(15, extracted.get(1).start);
       assertEquals(23, extracted.get(1).end);
+    }
+  }
+
+  /**
+   * Tests for the extractMentionedUUIDScreennames{WithIndices} methods
+   */
+  public static class MentionUUIDTest extends ExtractorTest {
+    public void testMentionAtTheBeginning() {
+      List<String> extracted = extractor.extractMentionedUUIDScreennames("@b7fe614d-8456-4e2a-baad-b2b825e13de7 mention");
+      assertList("Failed to extract mention at the beginning", new String[]{"b7fe614d-8456-4e2a-baad-b2b825e13de7"}, extracted);
+    }
+
+    public void testMentionWithLeadingSpace() {
+      List<String> extracted = extractor.extractMentionedUUIDScreennames(" @b7fe614d-8456-4e2a-baad-b2b825e13de7 mention");
+      assertList("Failed to extract mention with leading space", new String[]{"b7fe614d-8456-4e2a-baad-b2b825e13de7"}, extracted);
+    }
+
+    public void testMentionInMidText() {
+      List<String> extracted = extractor.extractMentionedUUIDScreennames("mention @b7fe614d-8456-4e2a-baad-b2b825e13de7 here");
+      assertList("Failed to extract mention in mid text", new String[]{"b7fe614d-8456-4e2a-baad-b2b825e13de7"}, extracted);
+    }
+
+    public void testMultipleMentions() {
+      List<String> extracted = extractor.extractMentionedUUIDScreennames("mention @b7fe614d-8456-4e2a-baad-b2b825e13de7 here and @9b6cc8a9-9677-430a-9711-5370be1fdc2c here");
+      assertList("Failed to extract multiple mentioned users", new String[]{"b7fe614d-8456-4e2a-baad-b2b825e13de7", "9b6cc8a9-9677-430a-9711-5370be1fdc2c"}, extracted);
+    }
+
+    public void testMentionWithIndices() {
+      List<Extractor.Entity> extracted = extractor.extractMentionedUUIDScreennamesWithIndices(" @b7fe614d-8456-4e2a-baad-b2b825e13de7 mention @9b6cc8a9-9677-430a-9711-5370be1fdc2c here @17c5b659-8c25-49fd-b9dc-631fe849e8aa ");
+      assertEquals(extracted.size(), 3);
+      assertEquals(extracted.get(0).getStart().intValue(), 1);
+      assertEquals(extracted.get(0).getEnd().intValue(), 38);
+      assertEquals(extracted.get(1).getStart().intValue(), 47);
+      assertEquals(extracted.get(1).getEnd().intValue(), 84);
+      assertEquals(extracted.get(2).getStart().intValue(), 90);
+      assertEquals(extracted.get(2).getEnd().intValue(), 127);
+    }
+
+    public void testMentionWithSupplementaryCharacters() {
+      // insert U+10400 before " @mention"
+      String text = String.format("%c @b7fe614d-8456-4e2a-baad-b2b825e13de7 %c @b7fe614d-8456-4e2a-baad-b2b825e13de7", 0x00010400, 0x00010400);
+
+      // count U+10400 as 2 characters (as in UTF-16)
+      List<Extractor.Entity> extracted = extractor.extractMentionedUUIDScreennamesWithIndices(text);
+      assertEquals(extracted.size(), 2);
+      assertEquals(extracted.get(0).value, "b7fe614d-8456-4e2a-baad-b2b825e13de7");
+      assertEquals(extracted.get(0).start, 3);
+      assertEquals(extracted.get(0).end, 40);
+      assertEquals(extracted.get(1).value, "b7fe614d-8456-4e2a-baad-b2b825e13de7");
+      assertEquals(extracted.get(1).start, 44);
+      assertEquals(extracted.get(1).end, 81);
+
+      // count U+10400 as single character
+      extractor.modifyIndicesFromUTF16ToToUnicode(text, extracted);
+      assertEquals(extracted.size(), 2);
+      assertEquals(extracted.get(0).start, 2);
+      assertEquals(extracted.get(0).end, 39);
+      assertEquals(extracted.get(1).start, 42);
+      assertEquals(extracted.get(1).end, 79);
+
+      // count U+10400 as 2 characters (as in UTF-16)
+      extractor.modifyIndicesFromUnicodeToUTF16(text, extracted);
+      assertEquals(2, extracted.size());
+      assertEquals(3, extracted.get(0).start);
+      assertEquals(40, extracted.get(0).end);
+      assertEquals(44, extracted.get(1).start);
+      assertEquals(81, extracted.get(1).end);
     }
   }
 
